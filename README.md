@@ -3,6 +3,12 @@
 
 > Backend para conectar Sql con flutter
 
+
+
+```bash
+git clone https://github.com/Jonathan03R/backend_rincon_sabor.git
+```
+
 ### 🏠 [Homepage](index.js)
 
 ## Install
@@ -17,17 +23,5 @@ npm install
 npm run test
 ```
 
-## Author
-
-👤 **jonathanRoque**
-
-* Website: www.jonathanroque.xyz/
-* Github: [@Jonathan03R](https://github.com/Jonathan03R)
-
-## Show your support
-
-Give a ⭐️ if this project helped you!
 
 
-***
-_This README was generated with ❤️ by [readme-md-generator](https://github.com/kefranabg/readme-md-generator)_
