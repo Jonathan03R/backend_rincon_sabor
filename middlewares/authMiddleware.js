@@ -1,5 +1,5 @@
 // middlewares/authMiddleware.js
-const admin = require('../firebaseConfig');
+const admin = require('../config/firebaseConfig');
 
 const verifyToken = async (req, res, next) => {
   // Aquí usamos “Bearer ” con espacio al final

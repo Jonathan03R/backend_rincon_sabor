@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middlewares/authMiddleware');
-const { poolPromise } = require('../connection'); // Asegúrate de tener la conexión correctamente configurada
+const { poolPromise } = require('../config/connection'); // Asegúrate de tener la conexión correctamente configurada
 
 const SP_OBTENER_USUARIO_POR_CORREO = 'Proc_ObtenerUsuarioPorCorreo';
 
