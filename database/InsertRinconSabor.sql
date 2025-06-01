@@ -3,16 +3,17 @@
 use JRrestauranteBuenSabor
 go
 
-INSERT INTO Pedidos.Mesa (mesaCodigo, mesaNumero, mesaEstado)
-VALUES
-('M000000001', 'Mesa 1', 'A'),
-('M000000002', 'Mesa 2', 'A'),
-('M000000003', 'Mesa 3', 'A'),
-('M000000004', 'Mesa 4', 'A'),
-('M000000005', 'Mesa 5', 'A'),
-('M000000006', 'Mesa 6', 'A'),
-('M000000007', 'Mesa 7', 'A'),
-('M000000008', 'Mesa 8', 'A'),
-('M000000009', 'Mesa 9', 'A'),
-('M000000010', 'Mesa 10', 'A');
+INSERT INTO Pedidos.Mesa (MesaCodigo, MesaNumero, MesaEstado) VALUES
+    ('MES0000001', '1', 'activa'),
+    ('MES0000002', '2', 'activa'),
+    ('MES0000003', '3', 'activa'),
+    ('MES0000004', '4', 'activa'),
+    ('MES0000005', '5', 'activa'),
+    ('MES0000006', '6', 'activa'),
+    ('MES0000007', '7', 'activa'),
+    ('MES0000008', '8', 'activa'),
+    ('MES0000009', '9', 'activa'),
+    ('MES0000010', '10', 'activa'),
+    ('MES0000011', '11', 'activa'),
+    ('MES0000012', '12', 'activa');
 go

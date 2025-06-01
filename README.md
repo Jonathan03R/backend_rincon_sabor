@@ -24,4 +24,13 @@ npm run test
 ```
 
 
+## .env
+
+DB_USER=
+DB_PASSWORD=
+DB_SERVER=
+DB_NAME=
+PORT=
+
+
 

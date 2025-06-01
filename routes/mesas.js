@@ -1,20 +1,33 @@
 // mesas.js
 
 const express = require('express');
-const { poolPromise } = require('../connection');  
+const { poolPromise } = require('../connection');
+
+//consstantes creadas para los procedimientos almacenados
+
+const SP_OBTENER_MESAS = 'Pedidos.Proc_ObtenerMesas';
 
 const router = express.Router();
 
-// Ruta para obtener todas las mesas
-router.get('/', async (req, res) => {
+
+router.get('/obtener', async (req, res) => {
   try {
-    const pool = await poolPromise;  // Obtener la conexión a la base de datos
-    const result = await pool.request().query('SELECT * FROM Pedidos.Mesa');  // Consulta a la tabla Mesa
-    res.json(result.recordset);  // Devolver las mesas en formato JSON
-  } catch (err) {
-    console.error('Error al obtener las mesas:', err);
-    res.status(500).send('Error al obtener las mesas');
+    const pool = await poolPromise;
+
+    const result = await pool.request().execute(SP_OBTENER_MESAS);
+
+    res.status(200).json({
+      success: true,
+      data: result.recordset
+    });
+  } catch (error) {
+    console.error('Error al obtener las mesas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno al obtener las mesas'
+    });
   }
 });
+
 
 module.exports = router;
