@@ -125,14 +125,25 @@ router.get('/mostrarProductos', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().execute(SP_MOSTRAR_PRODUCTOS);
 
+        // Envía tal cual lo que devuelve el procedimiento
         const productos = result.recordset.map(p => ({
-            ...p,
-            ProductoImage: p.ProductoImageUrl || null  // solo mandar la URL
+            ProductoCodigo: p.ProductoCodigo,
+            ProductoPlatos: p.ProductoPlatos,
+            ProductoDescripcion: p.ProductoDescripcion,
+            ProductoPrecio: p.ProductoPrecio,
+            ProductoEstado: p.ProductoEstado,
+            ProductoImageUrl: p.ProductoImageUrl,
+            ProductoCategoria: {
+                CategoriaCodigo: p.CategoriaCodigo,
+                CategoriaNombre: p.CategoriaNombre,
+                CategoriaDescripcion: p.CategoriaDescripcion,
+                CategoriaEstado: p.CategoriaEstado
+            }
         }));
 
         res.status(200).json({
             success: true,
-            data: productos,
+            data: productos
         });
     } catch (error) {
         console.error('Error al obtener los productos:', error);
@@ -142,6 +153,7 @@ router.get('/mostrarProductos', async (req, res) => {
         });
     }
 });
+
 
 
 module.exports = router;
