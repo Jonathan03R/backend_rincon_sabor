@@ -8,6 +8,7 @@ const SP_OBTENER_USUARIO_POR_CORREO = 'Proc_ObtenerUsuarioPorCorreo';
 const SP_LISTAR_USUARIOS = 'Proc_ListarUsuarios';
 const SP_ACTUALIZAR_ESTADO_USUARIO = 'Proc_CambiarEstadoUsuario';
 const SP_ELIMINAR_USUARIO = 'Proc_EliminarUsuario';
+const SP_INSERTAR_USUARIO = 'Proc_CrearUsuario';
 
 // Ruta protegida que requiere autenticación para obtener los datos del usuario
 router.get('/infoUser', verifyToken, async (req, res) => {
@@ -133,6 +134,41 @@ router.delete('/eliminar/:codigo', verifyToken , async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Error al eliminar el usuario',
+            error: error.message
+        });
+    }
+});
+
+
+router.post('/crear', async (req, res) => {
+    const { UsuarioNombre, UsuarioEmail, UsuarioDireccion, UsuarioTelefono, UsuarioRol } = req.body;
+
+    if (!UsuarioNombre || !UsuarioEmail || !UsuarioDireccion || !UsuarioTelefono || !UsuarioRol) {
+        return res.status(400).json({
+            success: false,
+            message: 'Todos los campos son requeridos'
+        });
+    }
+
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('UsuarioNombre', UsuarioNombre)
+            .input('UsuarioEmail', UsuarioEmail)
+            .input('UsuarioDireccion', UsuarioDireccion)
+            .input('UsuarioTelefono', UsuarioTelefono)
+            .input('UsuarioRol', UsuarioRol)
+            .execute(SP_INSERTAR_USUARIO);
+
+        return res.json({
+            success: true,
+            message: 'Usuario creado correctamente'
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al crear el usuario',
             error: error.message
         });
     }
