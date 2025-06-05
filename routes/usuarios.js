@@ -9,6 +9,7 @@ const SP_LISTAR_USUARIOS = 'Proc_ListarUsuarios';
 const SP_ACTUALIZAR_ESTADO_USUARIO = 'Proc_CambiarEstadoUsuario';
 const SP_ELIMINAR_USUARIO = 'Proc_EliminarUsuario';
 const SP_INSERTAR_USUARIO = 'Proc_CrearUsuario';
+const SP_ACTUALIZAR_USUARIO = 'Proc_ActualizarUsuario';
 
 // Ruta protegida que requiere autenticación para obtener los datos del usuario
 router.get('/infoUser', verifyToken, async (req, res) => {
@@ -173,6 +174,52 @@ router.post('/crear', async (req, res) => {
         });
     }
 });
+
+router.put('/actualizarUsuario', verifyToken, async (req, res) => {
+    const {
+        UsuarioCodigo,
+        UsuarioNombre,
+        UsuarioEmail,
+        UsuarioDireccion,
+        UsuarioTelefono,
+        UsuarioEstado,
+        UsuarioRol
+    } = req.body;
+
+    // Validaciones básicas
+    if (!UsuarioCodigo || !UsuarioNombre || !UsuarioEmail || !UsuarioDireccion || !UsuarioTelefono || !UsuarioEstado || !UsuarioRol) {
+        return res.status(400).json({
+            success: false,
+            message: 'Todos los campos son requeridos'
+        });
+    }
+
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('UsuarioCodigo', UsuarioCodigo)
+            .input('UsuarioNombre', UsuarioNombre)
+            .input('UsuarioEmail', UsuarioEmail)
+            .input('UsuarioDireccion', UsuarioDireccion)
+            .input('UsuarioTelefono', UsuarioTelefono)
+            .input('UsuarioEstado', UsuarioEstado)
+            .input('UsuarioRol', UsuarioRol)
+            .execute(SP_ACTUALIZAR_USUARIO);
+
+        return res.json({
+            success: true,
+            message: 'Usuario actualizado correctamente'
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al actualizar el usuario',
+            error: error.message
+        });
+    }
+});
+
 
 
 module.exports = router;
