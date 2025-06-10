@@ -4,6 +4,8 @@ const SP_MOSTRAR_MENU_COMPLETO = 'Proc_MostrarMenuCompleto';
 const SP_INSERTAR_MENU = 'Proc_InsertarMenu';
 const SP_CREAR_RECETA = 'Proc_CrearReceta';
 const SP_INSERTAR_INSUMO = 'Proc_InsertarInsumo';
+const SP_ELIMINAR_MENU = 'Proc_EliminarMenu';
+
 const insertarMenuConInsumo = async ({ MenuPlatos, MenuDescripcion, MenuPrecio, imageUrl, MenuCategoriaCodigo, InsumoUnidadMedida, InsumoStockActual, InsumoCompraUnidad }) => {
     const pool = await poolPromise;
 
@@ -103,4 +105,15 @@ const obtenerMenus = async () => {
 
     return menus;
 };
-module.exports = { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus };
+
+const eliminarMenu = async (MenuCodigo) => {
+    const pool = await poolPromise;
+
+    await pool.request()
+        .input('MenuCodigo', MenuCodigo)
+        .execute(SP_ELIMINAR_MENU);
+
+    return { message: `Menú ${MenuCodigo} eliminado correctamente` };
+};
+
+module.exports = { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus, eliminarMenu };

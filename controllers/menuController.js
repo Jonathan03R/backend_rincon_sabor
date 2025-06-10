@@ -1,4 +1,4 @@
-const { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus  } = require('../services/menuService');
+const { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus, eliminarMenu  } = require('../services/menuService');
 
 const agregarMenu = async (req, res) => {
     try {
@@ -46,5 +46,22 @@ const mostrarMenus = async (req, res) => {
     }
 };
 
+const eliminarMenuController = async (req, res) => {
+    try {
+        const { codigo } = req.params;
 
-module.exports = { agregarMenu, mostrarMenus  };
+        if (!codigo) {
+            return res.status(400).json({ success: false, message: 'Código de menú requerido' });
+        }
+
+        const result = await eliminarMenu(codigo);
+        res.status(200).json({ success: true, message: result.message });
+    } catch (error) {
+        console.error('Error al eliminar menú:', error);
+        res.status(500).json({ success: false, message: 'Error interno al eliminar menú' });
+    }
+};
+
+
+
+module.exports = { agregarMenu, mostrarMenus , eliminarMenuController };
