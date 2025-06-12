@@ -1,4 +1,6 @@
 // producto.js
+
+/// este YA NO VALE 
 const cloudinary = require('../config/cloudinary');
 const express = require('express');
 const sql = require('mssql');
