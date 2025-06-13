@@ -6,6 +6,9 @@ const { sql,poolPromise } = require('../config/connection');
 
 const SP_ACTUALIZAR_DETALLES = 'Pedidos.Proc_ActualizarDetallesPedido';
 const SP_OBTENER_PEDIDOS_POR_MESA = 'Proc_ObtenerPedidoPorMesa';
+const SP_CREAR_PEDIDO = 'Pedidos.Proc_CrearPedido';
+const SP_ELIMINAR_PEDIDO = 'Proc_EliminarPedidoPorCodigo';
+
 
 router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
     try {
@@ -117,7 +120,6 @@ router.post('/actualizarDetallesPedido', async (req, res) => {
     }
 });
 
-const SP_CREAR_PEDIDO = 'Pedidos.Proc_CrearPedido';
 
 router.post('/crearPedido', async (req, res) => {
     try {
@@ -169,4 +171,32 @@ router.post('/crearPedido', async (req, res) => {
     }
 });
 
+router.delete('/eliminar/:PedidoCodigo', async (req, res) => {
+    try {
+        const { PedidoCodigo } = req.params;
+
+        if (!PedidoCodigo) {
+            return res.status(400).json({
+                success: false,
+                message: 'Se requiere PedidoCodigo para eliminar.'
+            });
+        }
+
+        const pool = await poolPromise;
+        await pool.request()
+            .input('PedidoCodigo', sql.NChar(10), PedidoCodigo)
+            .execute(SP_ELIMINAR_PEDIDO);
+
+        res.status(200).json({
+            success: true,
+            message: 'Pedido eliminado correctamente'
+        });
+    } catch (error) {
+        console.error('Error al eliminar pedido:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno al eliminar pedido'
+        });
+    }
+});
 module.exports = router;
