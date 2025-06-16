@@ -4,6 +4,7 @@ require('dotenv').config();
 const http = require('http');
 const app = require('./index')
 const { configurarSockets } = require('./sockets/mesasSocket');
+const { configurarMenuSockets }= require('./sockets/menuSocket');
 const { Server } = require('socket.io');
 // pruebas host local
 
@@ -34,5 +35,5 @@ const io = new Server(server, {
 configurarSockets(io);
 
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
+    console.log(`⚡️Servidor corriendo en el puerto ${PORT}`);
 });

@@ -1,4 +1,4 @@
-const { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus, eliminarMenu  } = require('../services/menuService');
+const { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus, eliminarMenu , procesarMenu } = require('../services/menuService');
 
 const agregarMenu = async (req, res) => {
     try {
@@ -35,7 +35,6 @@ const agregarMenu = async (req, res) => {
     }
 };
 
-
 const mostrarMenus = async (req, res) => {
     try {
         const menus = await obtenerMenus();
@@ -62,6 +61,17 @@ const eliminarMenuController = async (req, res) => {
     }
 };
 
+async function procesarMenuController(req, res) {
+  const { MenuCodigo, Cantidad } = req.body;
+  if (!MenuCodigo || !Cantidad) {
+    return res.status(400).json({ success:false, message:'Faltan datos' });
+  }
+  try {
+    await procesarMenu(MenuCodigo, Cantidad);
+    res.json({ success:true, message:'Pedido procesado' });
+  } catch (err) {
+    res.status(500).json({ success:false, message: err.message });
+  }
+}
 
-
-module.exports = { agregarMenu, mostrarMenus , eliminarMenuController };
+module.exports = { agregarMenu, mostrarMenus , eliminarMenuController, procesarMenuController };
