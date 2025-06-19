@@ -1081,7 +1081,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE Pedidos.Proc_ObtenerPedidosActivos
+CREATE OR ALTER PROCEDURE Pedidos.Proc_ObtenerTodosLosPedidos
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1092,6 +1092,7 @@ BEGIN
         p.PedidoEstado,
         p.PedidoMesaCodigo,
         m.MesaNumero,
+        m.MesaEstado,
         dp.detallePedidoCodigo,
         dp.detallePedidoSubtotal,
         dp.detallePedidoCantidad,
@@ -1101,12 +1102,23 @@ BEGIN
         menu.MenuPlatos,
         menu.MenuPrecio,
         menu.MenuDescripcion,
-        menu.MenuImageUrl
+        menu.MenuImageUrl,
+        menu.MenuEsPreparado,
+        c.CategoriaNombre AS MenuCategoria
     FROM Pedidos.Pedido p
     INNER JOIN Pedidos.Mesa m ON p.PedidoMesaCodigo = m.MesaCodigo
     INNER JOIN Pedidos.DetallePedido dp ON dp.detallePedidoPedidoCodigo = p.PedidoCodigo
     INNER JOIN Pedidos.Menu menu ON menu.MenuCodigo = dp.detallePedidoMenuCodigo
-    WHERE p.PedidoEstado IN ('Pendiente', 'En cocina')
-    ORDER BY p.PedidoFechaHora ASC;
+    LEFT JOIN CategoriasProducto c ON menu.MenuCategoriaCodigo = c.CategoriaCodigo
+    ORDER BY 
+        CASE p.PedidoEstado
+            WHEN 'Pendiente' THEN 1
+            WHEN 'En cocina' THEN 2
+            WHEN 'Listo' THEN 3
+            WHEN 'Servido' THEN 4
+            WHEN 'Cancelado' THEN 5
+            ELSE 6
+        END,
+        p.PedidoFechaHora ASC;
 END
 GO

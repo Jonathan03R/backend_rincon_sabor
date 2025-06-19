@@ -2,9 +2,11 @@
 
 require('dotenv').config();
 const http = require('http');
+
 const app = require('./index')
 const { configurarSockets } = require('./sockets/mesasSocket');
 const { configurarMenuSockets }= require('./sockets/menuSocket');
+const { initSocket: initPedidosSocket } = require('./sockets/pedidosSocket');
 
 const { Server } = require('socket.io');
 // pruebas host local
@@ -34,6 +36,7 @@ const io = new Server(server, {
 
 // Configurar eventos de WebSocket
 configurarSockets(io);
+initPedidosSocket(io);
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`⚡️Servidor corriendo en el puerto ${PORT}`);

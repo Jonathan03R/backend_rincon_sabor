@@ -11,7 +11,7 @@ const SP_CREAR_PEDIDO = 'Pedidos.Proc_CrearPedido';
 const SP_PROCESAR_MENU = 'Proc_ProcesarMenu';
 const SP_ELIMINAR_PEDIDO = 'Proc_EliminarPedidoPorCodigo';
 const SP_DEVOLVER_STOCK_MENU = 'Pedidos.Proc_DevolverStockMenu';
-const SP_OBTENER_PEDIDOS_ACTIVOS = 'Pedidos.Proc_ObtenerPedidosActivos';
+const SP_OBTENER_PEDIDOS_ACTIVOS = 'Pedidos.Proc_ObtenerTodosLosPedidos';
 
 router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
     try {
@@ -292,7 +292,7 @@ router.get('/activos', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request()
-            .execute(Pedidos.SP_OBTENER_PEDIDOS_ACTIVOS);
+            .execute(SP_OBTENER_PEDIDOS_ACTIVOS);
 
         // Agrupar detalles por pedido
         const pedidosMap = new Map();
