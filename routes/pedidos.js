@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/connection');
+const { emitirActualizacionPedidos } = require('../sockets/pedidosSocket');
 
 const SP_ACTUALIZAR_DETALLES = 'Pedidos.Proc_ActualizarDetallesPedido';
 const SP_OBTENER_PEDIDOS_POR_MESA = 'Proc_ObtenerPedidoPorMesa';
@@ -10,6 +11,7 @@ const SP_CREAR_PEDIDO = 'Pedidos.Proc_CrearPedido';
 const SP_PROCESAR_MENU = 'Proc_ProcesarMenu';
 const SP_ELIMINAR_PEDIDO = 'Proc_EliminarPedidoPorCodigo';
 const SP_DEVOLVER_STOCK_MENU = 'Pedidos.Proc_DevolverStockMenu';
+const SP_OBTENER_PEDIDOS_ACTIVOS = 'Pedidos.Proc_ObtenerTodosLosPedidos';
 
 router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
     try {
@@ -219,10 +221,12 @@ router.post('/crearPedido', async (req, res) => {
 
         // 4) Commit si todo OK
         await tx.commit();
+        emitirActualizacionPedidos();
         res.status(201).json({
             success: true,
             message: 'Pedido creado y stock actualizado correctamente'
         });
+
     } catch (err) {
         // Rollback si algo falla (stock insuficiente, SP error, etc.)
         if (tx._aborted === false) await tx.rollback();
@@ -279,6 +283,58 @@ router.delete('/eliminar/:PedidoCodigo', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error interno al eliminar pedido'
+        });
+    }ß
+});
+
+//mostrar pedido
+router.get('/activos', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .execute(SP_OBTENER_PEDIDOS_ACTIVOS);
+
+        // Agrupar detalles por pedido
+        const pedidosMap = new Map();
+        result.recordset.forEach(row => {
+            const key = row.PedidoCodigo;
+            if (!pedidosMap.has(key)) {
+                pedidosMap.set(key, {
+                    PedidoCodigo: row.PedidoCodigo,
+                    PedidoFechaHora: row.PedidoFechaHora,
+                    PedidoTotal: row.PedidoTotal,
+                    PedidoEstado: row.PedidoEstado,
+                    MesaNumero: row.MesaNumero,
+                    Detalles: []
+                });
+            }
+            pedidosMap.get(key).Detalles.push({
+                DetallePedidoCodigo: row.detallePedidoCodigo,
+                Subtotal: row.detallePedidoSubtotal,
+                Cantidad: row.detallePedidoCantidad,
+                Estado: row.detallePedidoEstado,
+                Notas: row.detallePedidoNotas,
+                Producto: {
+                    MenuCodigo: row.MenuCodigo,
+                    MenuPlatos: row.MenuPlatos,
+                    MenuPrecio: row.MenuPrecio,
+                    MenuDescripcion: row.MenuDescripcion,
+                    MenuImageUrl: row.MenuImageUrl
+                }
+            });
+        });
+
+        const pedidos = Array.from(pedidosMap.values());
+
+        res.status(200).json({
+            success: true,
+            data: pedidos
+        });
+    } catch (error) {
+        console.error('Error al obtener pedidos activos:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno al obtener pedidos activos'
         });
     }
 });

@@ -1,6 +1,8 @@
 // index.js
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+require('dotenv').config();
 
 const mesasRouter = require ('./routes/mesas');
 const usuariosRouter = require('./routes/usuarios');
@@ -10,6 +12,7 @@ const menuRouter = require('./routes/menu');
 const pedidosRouter = require('./routes/pedidos');
 
 const app = express();
+app.use(helmet());
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -20,5 +23,14 @@ app.use('/categorias', categoriasRouter);
 app.use('/insumos', insumosRouter);
 app.use('/menu', menuRouter);   
 app.use('/pedidos', pedidosRouter);
+
+app.use((err, req, res, next) => {
+    console.error('Error:', err.stack);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Error interno del servidor',
+        error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+});
 
 module.exports = app;
