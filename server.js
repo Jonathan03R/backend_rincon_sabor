@@ -5,6 +5,7 @@ const http = require('http');
 const app = require('./index')
 const { configurarSockets } = require('./sockets/mesasSocket');
 const { configurarMenuSockets }= require('./sockets/menuSocket');
+
 const { Server } = require('socket.io');
 // pruebas host local
 
