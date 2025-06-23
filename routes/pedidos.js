@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/connection');
+const { emitirActualizacionMesas } = require('../sockets/mesasSocket');
 
 const SP_ACTUALIZAR_DETALLES = 'Pedidos.Proc_ActualizarDetallesPedido';
 const SP_OBTENER_PEDIDOS_POR_MESA = 'Proc_ObtenerPedidoPorMesa';
@@ -10,6 +11,8 @@ const SP_CREAR_PEDIDO = 'Pedidos.Proc_CrearPedido';
 const SP_PROCESAR_MENU = 'Proc_ProcesarMenu';
 const SP_ELIMINAR_PEDIDO = 'Proc_EliminarPedidoPorCodigo';
 const SP_DEVOLVER_STOCK_MENU = 'Pedidos.Proc_DevolverStockMenu';
+const SP_CAMBIAR_ESTADO_MESA = 'Pedidos.Proc_CambiarEstadoMesa';
+const SP_FINALIZAR_PEDIDO = 'Pedidos.Proc_FinalizarPedido';
 
 router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
     try {
@@ -20,7 +23,14 @@ router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
             .input('MesaCodigo', MesaCodigo)
             .execute(SP_OBTENER_PEDIDOS_POR_MESA);
 
-        const pedidosRaw = result.recordset;
+        const pedidosRaw = result.recordset || [];;
+        if (pedidosRaw.length === 0) {
+            await pool.request()
+                .input('MesaCodigo', sql.NChar(10), MesaCodigo)
+                .input('nuevoEstado', sql.NVarChar(20), 'Disponible')
+                .execute(SP_CAMBIAR_ESTADO_MESA);
+            emitirActualizacionMesas();
+        }
 
         const pedidosMap = new Map();
 
@@ -392,4 +402,53 @@ router.delete('/eliminar/:PedidoCodigo', async (req, res) => {
         });
     }
 });
+
+
+router.post('/finalizar/:PedidoCodigo', async (req, res) => {
+  try {
+    const { PedidoCodigo } = req.params;
+    if (!PedidoCodigo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere PedidoCodigo para finalizar.'
+      });
+    }
+
+    const pool = await poolPromise;
+    // 1) Obtener el código de mesa asociado al pedido
+    const pedidoRes = await pool.request()
+      .input('PedidoCodigo', sql.NChar(10), PedidoCodigo)
+      .query(`
+        SELECT PedidoMesaCodigo
+          FROM Pedidos.Pedido
+         WHERE PedidoCodigo = @PedidoCodigo
+      `);
+    const mesaCodigo = pedidoRes.recordset[0]?.PedidoMesaCodigo;
+
+    await pool.request()
+      .input('PedidoCodigo', sql.NChar(10), PedidoCodigo)
+      .execute(SP_FINALIZAR_PEDIDO);
+
+    // opcional: si quieres liberar la mesa tras servido,
+    // puedes descomentar esto:
+    await pool.request()
+      .input('MesaCodigo',  sql.NChar(10), mesaCodigo)
+      .input('nuevoEstado', sql.NVarChar(20), 'Disponible')
+      .execute(SP_CAMBIAR_ESTADO_MESA);
+
+    emitirActualizacionMesas();
+
+    res.status(200).json({
+      success: true,
+      message: 'Pedido finalizado correctamente.'
+    });
+  } catch (error) {
+    console.error('Error al finalizar pedido:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno al finalizar pedido'
+    });
+  }
+});
+
 module.exports = router;
