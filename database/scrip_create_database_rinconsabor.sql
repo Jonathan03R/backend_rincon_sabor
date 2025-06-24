@@ -1184,3 +1184,25 @@ BEGIN
 END
 GO
 
+-- Vistas de Ganancias y Ventas
+
+CREATE OR ALTER VIEW Ventas.VistaGananciasDeLasSemanas AS
+SELECT 
+    CONCAT('Semana ', DENSE_RANK() OVER (ORDER BY FechaInicioSemana)) AS Semana,
+    FechaInicioSemana,
+    FechaFinSemana,
+    SUM(PedidoTotal) AS TotalGanancia
+FROM (
+    SELECT
+        PedidoTotal,
+        PedidoFechaHora,
+        DATEADD(DAY, -DATEPART(WEEKDAY, PedidoFechaHora) + 1, CAST(PedidoFechaHora AS DATE)) AS FechaInicioSemana,
+        DATEADD(DAY, -DATEPART(WEEKDAY, PedidoFechaHora) + 7, CAST(PedidoFechaHora AS DATE)) AS FechaFinSemana
+    FROM Pedidos.Pedido
+    WHERE 
+        PedidoFechaHora >= DATEADD(WEEK, -4, GETDATE()) AND
+        PedidoFechaHora <= GETDATE() AND
+        PedidoEstado <> 'Cancelado'
+) AS Semanas
+GROUP BY FechaInicioSemana, FechaFinSemana;
+
