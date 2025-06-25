@@ -13,6 +13,8 @@ const SP_ELIMINAR_PEDIDO = 'Proc_EliminarPedidoPorCodigo';
 const SP_DEVOLVER_STOCK_MENU = 'Pedidos.Proc_DevolverStockMenu';
 const SP_OBTENER_PEDIDOS_ACTIVOS = 'Pedidos.Proc_ObtenerTodosLosPedidos';
 const SP_ACTUALIZAR_ESTADO_PEDIDO = 'Pedidos.Proc_ActualizarEstadoPedido';
+const SP_ACTUALIZAR_ESTADO_DETALLE = 'Pedidos.Proc_ActualizarEstadoDetallePedido';
+
 
 router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
     try {
@@ -285,7 +287,7 @@ router.delete('/eliminar/:PedidoCodigo', async (req, res) => {
             success: false,
             message: 'Error interno al eliminar pedido'
         });
-    }ß
+    } ß
 });
 
 //mostrar pedido
@@ -299,6 +301,7 @@ router.get('/activos', async (req, res) => {
         const pedidosMap = new Map();
         result.recordset.forEach(row => {
             const key = row.PedidoCodigo;
+
             if (!pedidosMap.has(key)) {
                 pedidosMap.set(key, {
                     PedidoCodigo: row.PedidoCodigo,
@@ -309,6 +312,7 @@ router.get('/activos', async (req, res) => {
                     Detalles: []
                 });
             }
+
             pedidosMap.get(key).Detalles.push({
                 DetallePedidoCodigo: row.detallePedidoCodigo,
                 Subtotal: row.detallePedidoSubtotal,
@@ -325,8 +329,25 @@ router.get('/activos', async (req, res) => {
             });
         });
 
-        const pedidos = Array.from(pedidosMap.values());
+        // Convertir a array y filtrar pedidos:
+        // Solo incluir los que NO tienen todos los detalles en 'Servido'
+        const pedidos = Array.from(pedidosMap.values()).filter(pedido => {
+            const estado = pedido.PedidoEstado.toLowerCase();
 
+            // Validar estado
+            if (estado === 'servido' || estado === 'cancelado') return false;
+
+            // Validar fecha (solo hoy)
+            const fechaPedido = new Date(pedido.PedidoFechaHora);
+            const hoy = new Date();
+
+            const esHoy =
+                fechaPedido.getFullYear() === hoy.getFullYear() &&
+                fechaPedido.getMonth() === hoy.getMonth() &&
+                fechaPedido.getDate() === hoy.getDate();
+
+            return esHoy;
+        });
         res.status(200).json({
             success: true,
             data: pedidos
@@ -370,4 +391,33 @@ router.put('/actualizarEstadoPedido/:PedidoCodigo', async (req, res) => {
     }
 });
 
+
+router.put('/actualizarEstadoDetalle/:detallePedidoCodigo', async (req, res) => {
+    const { detallePedidoCodigo } = req.params;
+    const { nuevoEstado } = req.body;
+
+    if (!detallePedidoCodigo || !nuevoEstado) {
+        return res.status(400).json({
+            success: false,
+            message: 'Se requiere detallePedidoCodigo y nuevoEstado.'
+        });
+    }
+
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('DetallePedidoCodigo', sql.NChar(10), detallePedidoCodigo)
+            .input('NuevoEstado', sql.NVarChar(20), nuevoEstado)
+            .execute(SP_ACTUALIZAR_ESTADO_DETALLE);
+
+        emitirActualizacionPedidos(detallePedidoCodigo); // opcional, si quieres emitir
+        res.json({ success: true, message: 'Estado del detalle actualizado.' });
+    } catch (error) {
+        console.error('Error al actualizar estado del detalle:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno al actualizar estado del detalle'
+        });
+    }
+});
 module.exports = router;
