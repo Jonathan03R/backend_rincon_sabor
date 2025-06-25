@@ -1,10 +1,12 @@
 const { poolPromise } = require('../config/connection');
+const { emitirActualizacionMenus } = require('../sockets/menuSocket');
 
 const SP_MOSTRAR_MENU_COMPLETO = 'Proc_MostrarMenuCompleto';
 const SP_INSERTAR_MENU = 'Proc_InsertarMenu';
 const SP_CREAR_RECETA = 'Proc_CrearReceta';
 const SP_INSERTAR_INSUMO = 'Proc_InsertarInsumo';
 const SP_ELIMINAR_MENU = 'Proc_EliminarMenu';
+const SP_PROCESAR_MENU = 'Proc_ProcesarMenu';
 
 const insertarMenuConInsumo = async ({ MenuPlatos, MenuDescripcion, MenuPrecio, imageUrl, MenuCategoriaCodigo, InsumoUnidadMedida, InsumoStockActual, InsumoCompraUnidad }) => {
     const pool = await poolPromise;
@@ -29,7 +31,7 @@ const insertarMenuConInsumo = async ({ MenuPlatos, MenuDescripcion, MenuPrecio, 
         .input('MenuInsumoCodigo', insumoCodigo)
         .input('MenuCategoriaCodigo', MenuCategoriaCodigo)
         .execute(SP_INSERTAR_MENU);
-
+    emitirActualizacionMenus();
     return { MenuCodigoCreado: menu.recordset[0].MenuCodigoCreado };
 };
 
@@ -64,10 +66,10 @@ const insertarMenuConReceta = async ({ MenuPlatos, MenuDescripcion, MenuPrecio, 
             .input('RecetaDetalleInsumo', detalle.insumoCodigo)
             .input('RecetaCantidadPorPlato', detalle.cantidad)
             .execute('Proc_CrearDetalleReceta');
-            console.log('Detalle de receta insertado:', detalle);
+        console.log('Detalle de receta insertado:', detalle);
     }
 
-
+    emitirActualizacionMenus();
     return { MenuCodigoCreado: menuCodigo, RecetaCodigoCreado: recetaCodigo };
 };
 
@@ -86,6 +88,8 @@ const obtenerMenus = async () => {
             MenuEstado: row.MenuEstado,
             MenuImageUrl: row.MenuImageUrl,
             MenuEsPreparado: row.MenuEsPreparado,
+            MenuDisponible: row.MenuDisponible === 1,
+            InsumosFaltantes: row.InsumosFaltantes,
             Categoria: {
                 CategoriaCodigo: row.CategoriaCodigo,
                 CategoriaNombre: row.CategoriaNombre,
@@ -112,8 +116,24 @@ const eliminarMenu = async (MenuCodigo) => {
     await pool.request()
         .input('MenuCodigo', MenuCodigo)
         .execute(SP_ELIMINAR_MENU);
-
+    emitirActualizacionMenus();
     return { message: `Menú ${MenuCodigo} eliminado correctamente` };
 };
 
-module.exports = { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus, eliminarMenu };
+async function procesarMenu(menuCodigo, cantidad) {
+    const pool = await poolPromise;
+    const tx = new sql.Transaction(pool);
+    try {
+        await tx.begin();
+        const req = new sql.Request(tx);
+        req.input('MenuCodigo', sql.NChar(10), menuCodigo);
+        req.input('Cantidad', sql.Decimal(10, 2), cantidad);
+        await req.execute(SP_PROCESAR_MENU);
+        await tx.commit();
+    } catch (err) {
+        await tx.rollback();
+        throw err;
+    }
+}
+
+module.exports = { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus, eliminarMenu, eliminarMenu, procesarMenu };
