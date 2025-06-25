@@ -391,6 +391,108 @@ as
 	end
 go
 
+-- Procedimiento para agregar categorias
+
+CREATE OR ALTER PROCEDURE Proc_AgregarCategoria
+    @CategoriaNombre NVARCHAR(100),
+    @CategoriaDescripcion NVARCHAR(200),
+    @CategoriaEstado NCHAR(1) = 'A' -- Estado por defecto: Activo
+AS
+  BEGIN
+
+    DECLARE @NuevoCodigo NCHAR(10);
+
+    -- Generar nuevo código para la categoría
+    BEGIN TRAN;
+
+    SELECT @NuevoCodigo = 'CAT' + RIGHT('0000000' + CAST(
+        ISNULL(MAX(CAST(SUBSTRING(CategoriaCodigo, 4, 7) AS INT)), 0) + 1 AS VARCHAR
+    ), 7)
+    FROM CategoriasProducto WITH (UPDLOCK, HOLDLOCK)
+    WHERE LEFT(CategoriaCodigo, 3) = 'CAT';
+
+    -- Insertar nueva categoría
+    INSERT INTO CategoriasProducto (
+        CategoriaCodigo,
+        CategoriaNombre,
+        CategoriaDescripcion,
+        CategoriaEstado
+    )
+    VALUES (
+        @NuevoCodigo,
+        @CategoriaNombre,
+        @CategoriaDescripcion,
+        @CategoriaEstado
+    );
+
+    COMMIT;
+
+    -- Retornar el código generado
+    SELECT @NuevoCodigo AS CategoriaCodigoCreada;
+  END
+GO
+
+-- Procedimiento para actualizar categorias
+
+CREATE OR ALTER PROCEDURE Proc_ActualizarCategorias
+    @CategoriaCodigo     NCHAR(10),
+    @CategoriaNombre     NVARCHAR(100),
+    @CategoriaDescripcion NVARCHAR(200),
+    @CategoriaEstado     NCHAR(1)
+AS
+BEGIN
+    -- Actualizar la categoría
+    UPDATE CategoriasProducto
+    SET 
+        CategoriaNombre = @CategoriaNombre,
+        CategoriaDescripcion = @CategoriaDescripcion
+    WHERE CategoriaCodigo = @CategoriaCodigo;
+END
+GO
+
+-- Procedimiento para eliminar una categoria
+
+CREATE OR ALTER PROCEDURE Proc_EliminarCategoria
+    @CategoriaCodigo NCHAR(10)
+AS
+  BEGIN
+
+    -- Verificar si la categoría existe
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM CategoriasProducto 
+        WHERE CategoriaCodigo = @CategoriaCodigo
+    )
+    BEGIN
+        RAISERROR('La categoría con el código especificado no existe.', 16, 1);
+        RETURN;
+    END
+
+    -- Eliminar los registros relacionados en Pedidos.DetallePedido
+    DELETE FROM Pedidos.DetallePedido
+    WHERE detallePedidoMenuCodigo IN (
+        SELECT MenuCodigo 
+        FROM Pedidos.Menu 
+        WHERE MenuCategoriaCodigo = @CategoriaCodigo
+    );
+
+    -- Eliminar los registros relacionados en Pedidos.Menu
+    DELETE FROM Pedidos.Menu
+    WHERE MenuCategoriaCodigo = @CategoriaCodigo;
+
+    -- Eliminar la categoría
+    DELETE FROM CategoriasProducto
+    WHERE CategoriaCodigo = @CategoriaCodigo;
+
+    -- Confirmar eliminación
+    IF @@ROWCOUNT = 0
+    BEGIN
+        RAISERROR('No se pudo eliminar la categoría.', 16, 1);
+    END
+  END
+GO
+
+
 --Procedimiento para mostrrar los productos con sus categoria
 
 CREATE OR ALTER PROCEDURE Proc_MostrarMenuCompleto
@@ -1081,6 +1183,30 @@ BEGIN
 END
 GO
 
+
+-- Vistas de Ganancias y Ventas EN OBSERVACION
+
+CREATE OR ALTER VIEW Ventas.VistaGananciasDeLasSemanas AS
+SELECT 
+    CONCAT('Semana ', DENSE_RANK() OVER (ORDER BY FechaInicioSemana)) AS Semana,
+    FechaInicioSemana,
+    FechaFinSemana,
+    SUM(PedidoTotal) AS TotalGanancia
+FROM (
+    SELECT
+        PedidoTotal,
+        PedidoFechaHora,
+        DATEADD(DAY, -DATEPART(WEEKDAY, PedidoFechaHora) + 1, CAST(PedidoFechaHora AS DATE)) AS FechaInicioSemana,
+        DATEADD(DAY, -DATEPART(WEEKDAY, PedidoFechaHora) + 7, CAST(PedidoFechaHora AS DATE)) AS FechaFinSemana
+    FROM Pedidos.Pedido
+    WHERE 
+        PedidoFechaHora >= DATEADD(WEEK, -4, GETDATE()) AND
+        PedidoFechaHora <= GETDATE() AND
+        PedidoEstado <> 'Cancelado'
+) AS Semanas
+GROUP BY FechaInicioSemana, FechaFinSemana;
+
+=======
 CREATE OR ALTER PROCEDURE Pedidos.Proc_ObtenerTodosLosPedidos
 AS
 BEGIN
@@ -1122,3 +1248,25 @@ BEGIN
         p.PedidoFechaHora ASC;
 END
 GO
+
+
+--Resumido en un proc.
+CREATE OR ALTER PROCEDURE Ventas.Proc_ResumenDiarioDelAnio
+    @Anio INT
+AS
+BEGIN
+    SELECT
+        CAST(PedidoFechaHora AS DATE) AS Fecha,
+        SUM(PedidoTotal) AS GananciasDelDia,
+        COUNT(*) AS NumeroPedidos
+    FROM 
+        Pedidos.Pedido
+    WHERE 
+        YEAR(PedidoFechaHora) = @Anio
+        AND PedidoEstado <> 'Cancelado'
+    GROUP BY
+        CAST(PedidoFechaHora AS DATE)
+    ORDER BY
+        Fecha
+END
+
