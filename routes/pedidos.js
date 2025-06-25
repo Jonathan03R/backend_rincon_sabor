@@ -433,6 +433,7 @@ router.get('/activos', async (req, res) => {
                     PedidoFechaHora: row.PedidoFechaHora,
                     PedidoTotal: row.PedidoTotal,
                     PedidoEstado: row.PedidoEstado,
+                    MesaCodigo: row.PedidoMesaCodigo,
                     MesaNumero: row.MesaNumero,
                     Detalles: []
                 });
@@ -456,22 +457,11 @@ router.get('/activos', async (req, res) => {
 
         // Convertir a array y filtrar pedidos:
         // Solo incluir los que NO tienen todos los detalles en 'Servido'
-        const pedidos = Array.from(pedidosMap.values()).filter(pedido => {
-            const estado = pedido.PedidoEstado.toLowerCase();
-
-            // Validar estado
-            if (estado === 'servido' || estado === 'cancelado') return false;
-
-            // Validar fecha (solo hoy)
-            const fechaPedido = new Date(pedido.PedidoFechaHora);
-            const hoy = new Date();
-
-            const esHoy =
-                fechaPedido.getFullYear() === hoy.getFullYear() &&
-                fechaPedido.getMonth() === hoy.getMonth() &&
-                fechaPedido.getDate() === hoy.getDate();
-
-            return esHoy;
+        const hoyIso = new Date().toISOString().slice(0, 10);
+        const pedidos = Array.from(pedidosMap.values()).filter(p => {
+            const fechaIso = new Date(p.PedidoFechaHora).toISOString().slice(0, 10);
+            return fechaIso === hoyIso
+                && !['servido', 'cancelado'].includes(p.PedidoEstado.toLowerCase());
         });
         res.status(200).json({
             success: true,
@@ -549,50 +539,50 @@ router.put('/actualizarEstadoDetalle/:detallePedidoCodigo', async (req, res) => 
 
 
 router.post('/finalizar/:PedidoCodigo', async (req, res) => {
-  try {
-    const { PedidoCodigo } = req.params;
-    if (!PedidoCodigo) {
-      return res.status(400).json({
-        success: false,
-        message: 'Se requiere PedidoCodigo para finalizar.'
-      });
-    }
+    try {
+        const { PedidoCodigo } = req.params;
+        if (!PedidoCodigo) {
+            return res.status(400).json({
+                success: false,
+                message: 'Se requiere PedidoCodigo para finalizar.'
+            });
+        }
 
-    const pool = await poolPromise;
-    // 1) Obtener el código de mesa asociado al pedido
-    const pedidoRes = await pool.request()
-      .input('PedidoCodigo', sql.NChar(10), PedidoCodigo)
-      .query(`
+        const pool = await poolPromise;
+        // 1) Obtener el código de mesa asociado al pedido
+        const pedidoRes = await pool.request()
+            .input('PedidoCodigo', sql.NChar(10), PedidoCodigo)
+            .query(`
         SELECT PedidoMesaCodigo
           FROM Pedidos.Pedido
          WHERE PedidoCodigo = @PedidoCodigo
       `);
-    const mesaCodigo = pedidoRes.recordset[0]?.PedidoMesaCodigo;
+        const mesaCodigo = pedidoRes.recordset[0]?.PedidoMesaCodigo;
 
-    await pool.request()
-      .input('PedidoCodigo', sql.NChar(10), PedidoCodigo)
-      .execute(SP_FINALIZAR_PEDIDO);
+        await pool.request()
+            .input('PedidoCodigo', sql.NChar(10), PedidoCodigo)
+            .execute(SP_FINALIZAR_PEDIDO);
 
-    // opcional: si quieres liberar la mesa tras servido,
-    // puedes descomentar esto:
-    await pool.request()
-      .input('MesaCodigo',  sql.NChar(10), mesaCodigo)
-      .input('nuevoEstado', sql.NVarChar(20), 'Disponible')
-      .execute(SP_CAMBIAR_ESTADO_MESA);
+        // opcional: si quieres liberar la mesa tras servido,
+        // puedes descomentar esto:
+        await pool.request()
+            .input('MesaCodigo', sql.NChar(10), mesaCodigo)
+            .input('nuevoEstado', sql.NVarChar(20), 'Disponible')
+            .execute(SP_CAMBIAR_ESTADO_MESA);
 
-    emitirActualizacionMesas();
+        emitirActualizacionMesas();
 
-    res.status(200).json({
-      success: true,
-      message: 'Pedido finalizado correctamente.'
-    });
-  } catch (error) {
-    console.error('Error al finalizar pedido:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno al finalizar pedido'
-    });
-  }
+        res.status(200).json({
+            success: true,
+            message: 'Pedido finalizado correctamente.'
+        });
+    } catch (error) {
+        console.error('Error al finalizar pedido:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno al finalizar pedido'
+        });
+    }
 });
 
 
