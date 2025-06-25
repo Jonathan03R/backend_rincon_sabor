@@ -1250,6 +1250,26 @@ END
 GO
 
 
+
+CREATE PROCEDURE Pedidos.Proc_ActualizarEstadoDetallePedido
+    @DetallePedidoCodigo NCHAR(10),
+    @NuevoEstado NVARCHAR(20)
+AS
+BEGIN
+    -- Validar estado permitido
+    IF @NuevoEstado NOT IN ('Pendiente', 'Preparando', 'Listo', 'Servido', 'Cancelado')
+    BEGIN
+        RAISERROR('Estado no válido.', 16, 1)
+        RETURN
+    END
+
+    -- Actualizar estado
+    UPDATE Pedidos.DetallePedido
+    SET detallePedidoEstado = @NuevoEstado
+    WHERE detallePedidoCodigo = @DetallePedidoCodigo
+END
+GO
+
 --Resumido en un proc.
 CREATE OR ALTER PROCEDURE Ventas.Proc_ResumenDiarioDelAnio
     @Anio INT
@@ -1269,4 +1289,5 @@ BEGIN
     ORDER BY
         Fecha
 END
+
 
