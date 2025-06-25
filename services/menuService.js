@@ -1,4 +1,5 @@
 const { poolPromise } = require('../config/connection');
+const { emitirActualizacionMenus } = require('../sockets/menuSocket');
 
 const SP_MOSTRAR_MENU_COMPLETO = 'Proc_MostrarMenuCompleto';
 const SP_INSERTAR_MENU = 'Proc_InsertarMenu';
