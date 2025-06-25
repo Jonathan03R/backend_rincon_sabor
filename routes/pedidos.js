@@ -12,6 +12,7 @@ const SP_PROCESAR_MENU = 'Proc_ProcesarMenu';
 const SP_ELIMINAR_PEDIDO = 'Proc_EliminarPedidoPorCodigo';
 const SP_DEVOLVER_STOCK_MENU = 'Pedidos.Proc_DevolverStockMenu';
 const SP_OBTENER_PEDIDOS_ACTIVOS = 'Pedidos.Proc_ObtenerTodosLosPedidos';
+const SP_ACTUALIZAR_ESTADO_PEDIDO = 'Pedidos.Proc_ActualizarEstadoPedido';
 
 router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
     try {
@@ -338,4 +339,35 @@ router.get('/activos', async (req, res) => {
         });
     }
 });
+
+// Nuevo endpoint para cambiar el estado del pedido
+router.put('/actualizarEstadoPedido/:PedidoCodigo', async (req, res) => {
+    const { PedidoCodigo } = req.params;
+    const { nuevoEstado } = req.body;
+
+    if (!PedidoCodigo || !nuevoEstado) {
+        return res.status(400).json({
+            success: false,
+            message: 'Se requiere PedidoCodigo y nuevoEstado.'
+        });
+    }
+
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('PedidoCodigo', sql.NChar(10), PedidoCodigo)
+            .input('nuevoEstado', sql.NVarChar(20), nuevoEstado)
+            .execute(SP_ACTUALIZAR_ESTADO_PEDIDO);
+
+        emitirActualizacionPedidos(PedidoCodigo);
+        res.json({ success: true, message: 'Estado del pedido actualizado.' });
+    } catch (error) {
+        console.error('Error al actualizar estado del pedido:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno al actualizar estado del pedido'
+        });
+    }
+});
+
 module.exports = router;
