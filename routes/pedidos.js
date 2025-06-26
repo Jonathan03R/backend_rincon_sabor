@@ -457,12 +457,33 @@ router.get('/activos', async (req, res) => {
 
         // Convertir a array y filtrar pedidos:
         // Solo incluir los que NO tienen todos los detalles en 'Servido'
-        const hoyIso = new Date().toISOString().slice(0, 10);
+        const hoy = new Date();
+        const hoyIso = [
+            hoy.getFullYear(),
+            String(hoy.getMonth() + 1).padStart(2, '0'),
+            String(hoy.getDate()).padStart(2, '0')
+        ].join('-');
+        console.log('hoyIso (local):', hoyIso);
+
         const pedidos = Array.from(pedidosMap.values()).filter(p => {
-            const fechaIso = new Date(p.PedidoFechaHora).toISOString().slice(0, 10);
-            return fechaIso === hoyIso
-                && !['servido', 'cancelado'].includes(p.PedidoEstado.toLowerCase());
+            const fecha = new Date(p.PedidoFechaHora);
+            const fechaIso = [
+                fecha.getFullYear(),
+                String(fecha.getMonth() + 1).padStart(2, '0'),
+                String(fecha.getDate()).padStart(2, '0')
+            ].join('-');
+            const estado = p.PedidoEstado.toLowerCase();
+
+            console.log(`Pedido ${p.PedidoCodigo}: fechaIso=${fechaIso}, estado=${estado}`);
+
+            const pasaFecha = fechaIso === hoyIso;
+            const pasaEstado = !['servido', 'cancelado'].includes(estado);
+            console.log(` → pasaFecha? ${pasaFecha}, pasaEstado? ${pasaEstado}`);
+
+            return pasaFecha && pasaEstado;
         });
+
+        console.log(`Pedidos filtrados: ${pedidos.length}`);
         res.status(200).json({
             success: true,
             data: pedidos
