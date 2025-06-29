@@ -1019,7 +1019,17 @@ BEGIN
         d.detallePedidoMenuCodigo
     FROM @Detalles d
     CROSS JOIN CodigosBase c
-    WHERE d.detallePedidoCodigo = ''
+    WHERE d.detallePedidoCodigo = '';
+
+    -- 4. Recalcular y grabar el total del pedido
+    DECLARE @NuevoTotal DECIMAL(10,2);
+    SELECT @NuevoTotal = ISNULL(SUM(detallePedidoSubtotal),0)
+      FROM Pedidos.DetallePedido
+      WHERE detallePedidoPedidoCodigo = @PedidoCodigo;
+
+    UPDATE Pedidos.Pedido
+    SET PedidoTotal = @NuevoTotal
+    WHERE PedidoCodigo = @PedidoCodigo;
 END
 GO
 
