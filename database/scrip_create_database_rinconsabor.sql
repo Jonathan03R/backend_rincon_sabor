@@ -1058,11 +1058,13 @@ BEGIN
     -- Insertar pedido
     INSERT INTO Pedidos.Pedido (
         PedidoCodigo,
+		PedidoFechaHora, 
         PedidoTotal,
         PedidoMesaCodigo
     )
     VALUES (
         @PedidoCodigo,
+		SYSDATETIMEOFFSET() AT TIME ZONE 'SA Pacific Standard Time', 
         @Total,
         @MesaCodigo
     );
