@@ -93,6 +93,8 @@ router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
 
 router.post('/actualizarDetallesPedido', async (req, res) => {
     const { PedidoCodigo, Detalles } = req.body;
+
+    console.log('Actualizar detalles pedido:', PedidoCodigo, Detalles);
     if (!PedidoCodigo || !Array.isArray(Detalles)) {
         return res.status(400).json({
             success: false,
@@ -294,10 +296,10 @@ router.post('/crearPedido', async (req, res) => {
                 const menuRes = await tx.request()
                     .input('MenuCodigo', sql.NChar(10), d.detallePedidoMenuCodigo)
                     .query(`
-        SELECT MenuInsumoCodigo 
-          FROM Pedidos.Menu 
-         WHERE MenuCodigo = @MenuCodigo
-      `);
+                    SELECT MenuInsumoCodigo 
+                    FROM Pedidos.Menu 
+                    WHERE MenuCodigo = @MenuCodigo
+                `);
                 const insumoCodigo = menuRes.recordset[0]?.MenuInsumoCodigo;
                 if (!insumoCodigo) {
                     throw new Error(`No hay insumo asociado al menú ${d.detallePedidoMenuCodigo}`);
