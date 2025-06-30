@@ -2,7 +2,6 @@
 
 const express = require('express');
 const router = express.Router();
-// import { utcToZonedTime, format } from 'date-fns-tz';
 const { sql, poolPromise } = require('../config/connection');
 
 const { emitirActualizacionMesas } = require('../sockets/mesasSocket');
@@ -94,8 +93,6 @@ router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
 
 router.post('/actualizarDetallesPedido', async (req, res) => {
     const { PedidoCodigo, Detalles } = req.body;
-
-    console.log('Actualizar detalles pedido:', PedidoCodigo, Detalles);
     if (!PedidoCodigo || !Array.isArray(Detalles)) {
         return res.status(400).json({
             success: false,
@@ -297,10 +294,10 @@ router.post('/crearPedido', async (req, res) => {
                 const menuRes = await tx.request()
                     .input('MenuCodigo', sql.NChar(10), d.detallePedidoMenuCodigo)
                     .query(`
-                    SELECT MenuInsumoCodigo 
-                    FROM Pedidos.Menu 
-                    WHERE MenuCodigo = @MenuCodigo
-                `);
+        SELECT MenuInsumoCodigo 
+          FROM Pedidos.Menu 
+         WHERE MenuCodigo = @MenuCodigo
+      `);
                 const insumoCodigo = menuRes.recordset[0]?.MenuInsumoCodigo;
                 if (!insumoCodigo) {
                     throw new Error(`No hay insumo asociado al menú ${d.detallePedidoMenuCodigo}`);
@@ -418,6 +415,15 @@ router.delete('/eliminar/:PedidoCodigo', async (req, res) => {
     } ß
 });
 
+
+function formatFechaLima(fecha) {
+    const lima = new Date(fecha.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+    return [
+        lima.getFullYear(),
+        String(lima.getMonth() + 1).padStart(2, '0'),
+        String(lima.getDate()).padStart(2, '0')
+    ].join('-');
+}
 //mostrar pedido
 router.get('/activos', async (req, res) => {
     try {
@@ -458,21 +464,22 @@ router.get('/activos', async (req, res) => {
             });
         });
 
-        // 2) Fecha “hoy” en Lima
-        const { utcToZonedTime, format } = await import('date-fns-tz');
-        const timeZone = 'America/Lima';
-        const hoyIso = format(utcToZonedTime(new Date(), timeZone), 'yyyy-MM-dd', { timeZone });
-        console.log('hoyIso (Peru):', hoyIso);
+        // Convertir a array y filtrar pedidos:
+        // Solo incluir los que NO tienen todos los detalles en 'Servido'
+        const hoyIso = formatFechaLima(new Date());
+        console.log('Hoy (Lima):', hoyIso);
 
-        // 3) Filtrar sólo pedidos de hoy y no servidos/cancelados
         const pedidos = Array.from(pedidosMap.values()).filter(p => {
-            const pedidoPeru = utcToZonedTime(new Date(p.PedidoFechaHora), timeZone);
-            const fechaIso   = format(pedidoPeru, 'yyyy-MM-dd', { timeZone });
-            const estado     = p.PedidoEstado.toLowerCase();
+            const fechaIso = formatFechaLima(new Date(p.PedidoFechaHora));
+            const estado = p.PedidoEstado.toLowerCase();
 
             console.log(`Pedido ${p.PedidoCodigo}: fechaIso=${fechaIso}, estado=${estado}`);
-            return fechaIso === hoyIso
-                && !['servido','cancelado'].includes(estado);
+
+            const pasaFecha = fechaIso === hoyIso;
+            const pasaEstado = !['servido', 'cancelado'].includes(estado);
+            console.log(` → pasaFecha? ${pasaFecha}, pasaEstado? ${pasaEstado}`);
+
+            return pasaFecha && pasaEstado;
         });
 
         console.log(`Pedidos filtrados: ${pedidos.length}`);
