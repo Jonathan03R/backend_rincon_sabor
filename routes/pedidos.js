@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-import { utcToZonedTime, format } from 'date-fns-tz';
+// import { utcToZonedTime, format } from 'date-fns-tz';
 const { sql, poolPromise } = require('../config/connection');
 
 const { emitirActualizacionMesas } = require('../sockets/mesasSocket');
@@ -458,29 +458,21 @@ router.get('/activos', async (req, res) => {
             });
         });
 
-        // Convertir a array y filtrar pedidos:
-        // Solo incluir los que NO tienen todos los detalles en 'Servido'
+        // 2) Fecha “hoy” en Lima
+        const { utcToZonedTime, format } = await import('date-fns-tz');
         const timeZone = 'America/Lima';
-        // 1) Fecha “hoy” en Lima
-        const now = new Date();
-        const peruNow = utcToZonedTime(now, timeZone);
-        const hoyIso = format(peruNow, 'yyyy-MM-dd', { timeZone });
+        const hoyIso = format(utcToZonedTime(new Date(), timeZone), 'yyyy-MM-dd', { timeZone });
         console.log('hoyIso (Peru):', hoyIso);
 
+        // 3) Filtrar sólo pedidos de hoy y no servidos/cancelados
         const pedidos = Array.from(pedidosMap.values()).filter(p => {
-            // 2) Fecha de cada pedido convertida a Lima
-            const pedidoUtc = new Date(p.PedidoFechaHora);
-            const pedidoPeru = utcToZonedTime(pedidoUtc, timeZone);
-            const fechaIso = format(pedidoPeru, 'yyyy-MM-dd', { timeZone });
+            const pedidoPeru = utcToZonedTime(new Date(p.PedidoFechaHora), timeZone);
+            const fechaIso   = format(pedidoPeru, 'yyyy-MM-dd', { timeZone });
+            const estado     = p.PedidoEstado.toLowerCase();
 
-            const estado = p.PedidoEstado.toLowerCase();
             console.log(`Pedido ${p.PedidoCodigo}: fechaIso=${fechaIso}, estado=${estado}`);
-
-            const pasaFecha = fechaIso === hoyIso;
-            const pasaEstado = !['servido', 'cancelado'].includes(estado);
-            console.log(` → pasaFecha? ${pasaFecha}, pasaEstado? ${pasaEstado}`);
-
-            return pasaFecha && pasaEstado;
+            return fechaIso === hoyIso
+                && !['servido','cancelado'].includes(estado);
         });
 
         console.log(`Pedidos filtrados: ${pedidos.length}`);
