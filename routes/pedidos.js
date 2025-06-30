@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { utcToZonedTime, format } = require('date-fns-tz');
+import { utcToZonedTime, format } from 'date-fns-tz';
 const { sql, poolPromise } = require('../config/connection');
 
 const { emitirActualizacionMesas } = require('../sockets/mesasSocket');
