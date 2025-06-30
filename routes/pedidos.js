@@ -2,6 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { utcToZonedTime, format } = require('date-fns-tz');
 const { sql, poolPromise } = require('../config/connection');
 
 const { emitirActualizacionMesas } = require('../sockets/mesasSocket');
@@ -459,23 +460,20 @@ router.get('/activos', async (req, res) => {
 
         // Convertir a array y filtrar pedidos:
         // Solo incluir los que NO tienen todos los detalles en 'Servido'
-        const hoy = new Date();
-        const hoyIso = [
-            hoy.getFullYear(),
-            String(hoy.getMonth() + 1).padStart(2, '0'),
-            String(hoy.getDate()).padStart(2, '0')
-        ].join('-');
-        console.log('hoyIso (local):', hoyIso);
+        const timeZone = 'America/Lima';
+        // 1) Fecha “hoy” en Lima
+        const now = new Date();
+        const peruNow = utcToZonedTime(now, timeZone);
+        const hoyIso = format(peruNow, 'yyyy-MM-dd', { timeZone });
+        console.log('hoyIso (Peru):', hoyIso);
 
         const pedidos = Array.from(pedidosMap.values()).filter(p => {
-            const fecha = new Date(p.PedidoFechaHora);
-            const fechaIso = [
-                fecha.getFullYear(),
-                String(fecha.getMonth() + 1).padStart(2, '0'),
-                String(fecha.getDate()).padStart(2, '0')
-            ].join('-');
-            const estado = p.PedidoEstado.toLowerCase();
+            // 2) Fecha de cada pedido convertida a Lima
+            const pedidoUtc = new Date(p.PedidoFechaHora);
+            const pedidoPeru = utcToZonedTime(pedidoUtc, timeZone);
+            const fechaIso = format(pedidoPeru, 'yyyy-MM-dd', { timeZone });
 
+            const estado = p.PedidoEstado.toLowerCase();
             console.log(`Pedido ${p.PedidoCodigo}: fechaIso=${fechaIso}, estado=${estado}`);
 
             const pasaFecha = fechaIso === hoyIso;
