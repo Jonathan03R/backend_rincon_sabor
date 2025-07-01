@@ -194,6 +194,13 @@ CREATE TYPE Pedidos.TipoDetallePedido AS TABLE
 )
 GO
 
+create type DetalleRecetaType as table (
+    insumoCodigo nchar(10),
+    cantidad decimal(10,2)
+);
+go
+
+
 
 
 
@@ -639,7 +646,147 @@ END
 GO
 
 
+create or alter procedure Proc_ActualizarMenuCompleto
+    @MenuCodigo nchar(10),
+    @MenuPlatos nvarchar(100),
+    @MenuDescripcion nvarchar(500),
+    @MenuPrecio decimal(10,2),
+    @MenuEstado nchar(1),
+    @MenuImageUrl nvarchar(max),
+    @MenuCategoriaCodigo nchar(10),
+    @MenuEsPreparado nchar(1),
+    @MenuInsumoCodigo nchar(10) = null, -- solo si no es preparado
+    @DetallesReceta DetalleRecetaType readonly -- tipo tabla
+as
+begin
+    begin try
+        begin transaction;
 
+        -- 1. Actualizar datos base del menú
+        update Pedidos.Menu
+        set MenuPlatos = @MenuPlatos,
+            MenuDescripcion = @MenuDescripcion,
+            MenuPrecio = @MenuPrecio,
+            MenuEstado = @MenuEstado,
+            MenuImageUrl = @MenuImageUrl,
+            MenuCategoriaCodigo = @MenuCategoriaCodigo,
+            MenuEsPreparado = @MenuEsPreparado,
+            MenuInsumoCodigo = @MenuInsumoCodigo
+        where MenuCodigo = @MenuCodigo;
+
+        -- 2. Si es preparado, manejar receta
+        if @MenuEsPreparado = 'A'
+        begin
+            declare @RecetaCodigo nchar(10);
+
+            -- Obtener receta asociada
+            select @RecetaCodigo = RecetaCodigo 
+            from Recetas 
+            where RecetaMenuCodigo = @MenuCodigo;
+
+            -- Si no existe receta, crearla
+            if @RecetaCodigo is null
+            begin
+                select @RecetaCodigo = 'REC' + RIGHT('0000000' + CAST(
+                    ISNULL(MAX(CAST(SUBSTRING(RecetaCodigo, 4, 7) AS INT)), 0) + 1 AS VARCHAR
+                ), 7)
+                from Recetas with (updlock, holdlock)
+                where LEFT(RecetaCodigo, 3) = 'REC';
+
+                insert into Recetas (RecetaCodigo, RecetaMenuCodigo, RecetaEstado)
+                values (@RecetaCodigo, @MenuCodigo, 'A');
+            end
+
+            -- Eliminar detalles anteriores
+            delete from RecetaDetalles where RecetaDetalleReceta = @RecetaCodigo;
+			--
+            -- Obtener contador base para código
+            declare @contadorBase int = (
+				select isnull(
+				  MAX(CAST(SUBSTRING(RecetaDetalleCodigo, 4, 7) AS int)), 
+				  0
+				)
+				from RecetaDetalles
+				where LEFT(RecetaDetalleCodigo,3) = 'DER'
+			);
+
+			-- Insertar nuevos detalles con prefijo DER
+			;with DetallesEnumerados as (
+				select 
+					ROW_NUMBER() over (order by (select null)) as RowNum,
+					insumoCodigo,
+					cantidad
+				from @DetallesReceta
+			)
+			insert into RecetaDetalles (
+				RecetaDetalleCodigo,
+				RecetaDetalleReceta,
+				RecetaDetalleInsumo,
+				RecetaDetalleCantidadporPlato
+			)
+			select 
+				'DER' 
+				  + RIGHT('0000000' 
+						  + CAST(@contadorBase + RowNum AS varchar(7))
+						,7),
+				@RecetaCodigo,
+				insumoCodigo,
+				cantidad
+			from DetallesEnumerados;
+        end
+
+        commit transaction;
+    end try
+    begin catch
+        rollback transaction;
+        throw;
+    end catch
+end
+go
+
+create or alter procedure ObtenerInformacionMenu
+    @MenuCodigo nchar(10)
+as
+begin
+    set nocount on;
+
+    select 
+        m.MenuCodigo,
+        m.MenuPlatos,
+        m.MenuDescripcion,
+        m.MenuPrecio,
+        m.MenuEstado,
+        m.MenuImageUrl,
+        m.MenuEsPreparado,
+        m.MenuCategoriaCodigo,
+        i.InsumoCodigo as InsumoDirectoCodigo,
+        i.InsumoNombre as InsumoDirectoNombre
+    from Pedidos.Menu m
+    left join Insumos i on m.MenuInsumoCodigo = i.InsumoCodigo
+    where m.MenuCodigo = @MenuCodigo;
+
+    -- Si el menú es preparado, mostrar los insumos de la receta
+    if exists (
+        select 1
+        from Pedidos.Menu
+        where MenuCodigo = @MenuCodigo and MenuEsPreparado = 'A'
+    )
+    begin
+        select 
+            rd.RecetaDetalleCodigo,
+            rd.RecetaDetalleCantidadporPlato,
+            ins.InsumoCodigo,
+            ins.InsumoNombre,
+            ins.InsumoUnidadMedida,
+            ins.InsumoStockActual,
+            ins.InsumoCompraUnidad
+        from Recetas r
+        inner join RecetaDetalles rd on r.RecetaCodigo = rd.RecetaDetalleReceta
+        inner join Insumos ins on rd.RecetaDetalleInsumo = ins.InsumoCodigo
+        where r.RecetaMenuCodigo = @MenuCodigo;
+    end
+end
+go
 
 --=============================================================================================================================================
 --								INSUMOS

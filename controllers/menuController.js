@@ -1,4 +1,12 @@
-const { insertarMenuConReceta, insertarMenuConInsumo, obtenerMenus, eliminarMenu , procesarMenu } = require('../services/menuService');
+const { 
+    insertarMenuConReceta, 
+    insertarMenuConInsumo, 
+    obtenerMenus, 
+    eliminarMenu , 
+    procesarMenu,
+    obtenerMenuPorCodigo, 
+    actualizarMenuCompleto
+ } = require('../services/menuService');
 
 const agregarMenu = async (req, res) => {
     try {
@@ -74,4 +82,40 @@ async function procesarMenuController(req, res) {
   }
 }
 
-module.exports = { agregarMenu, mostrarMenus , eliminarMenuController, procesarMenuController };
+const obtenerMenuController = async (req, res) => {
+    try {
+        const { codigo } = req.params;
+        const menu = await obtenerMenuPorCodigo(codigo);
+        res.status(200).json({ success: true, data: menu });
+    } catch (error) {
+        console.error('Error al obtener menú por código:', error);
+        res.status(500).json({ success: false, message: 'Error interno al obtener menú' });
+    }
+};
+
+const actualizarMenuController = async (req, res) => {
+    try {
+        const menu = req.body;
+
+        if (!menu.MenuCodigo) {
+            return res.status(400).json({ success: false, message: 'Falta el código de menú' });
+        }
+
+        await actualizarMenuCompleto(menu);
+
+        res.status(200).json({ success: true, message: 'Menú actualizado correctamente' });
+    } catch (error) {
+        console.error('Error al actualizar menú:', error);
+        res.status(500).json({ success: false, message: 'Error interno al actualizar menú' });
+    }
+};
+
+
+module.exports = { 
+    agregarMenu, 
+    mostrarMenus , 
+    eliminarMenuController, 
+    procesarMenuController,
+    obtenerMenuController, 
+    actualizarMenuController
+};
