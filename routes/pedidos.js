@@ -20,9 +20,8 @@ const SP_CAMBIAR_ESTADO_MESA = 'Pedidos.Proc_CambiarEstadoMesa';
 const SP_FINALIZAR_PEDIDO = 'Pedidos.Proc_FinalizarPedido';
 const SP_OBTENER_PEDIDOS_ACTIVOS = 'Pedidos.Proc_ObtenerTodosLosPedidos';
 const SP_ACTUALIZAR_ESTADO_PEDIDO = 'Pedidos.Proc_ActualizarEstadoPedido';
+const SP_OBTENER_TODOS_LOS_PEDIDOS = 'Pedidos.Proc_ObtenerTodosLosPedidos';
 const SP_ACTUALIZAR_ESTADO_DETALLE = 'Pedidos.Proc_ActualizarEstadoDetallePedido';
-
-
 
 router.get('/obtenerPorMesas/:MesaCodigo', async (req, res) => {
     try {
@@ -528,6 +527,62 @@ router.put('/actualizarEstadoPedido/:PedidoCodigo', async (req, res) => {
 });
 
 
+// Nuevo endpoint para obtener todos los pedidos con paginación
+router.get('/todos', async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+    const pool = await poolPromise;
+    const result = await pool.request().execute(SP_OBTENER_TODOS_LOS_PEDIDOS);
+
+    const pedidosMap = new Map();
+    result.recordset.forEach(row => {
+      const key = row.PedidoCodigo;
+      if (!pedidosMap.has(key)) {
+        pedidosMap.set(key, {
+          PedidoCodigo: row.PedidoCodigo,
+          PedidoFechaHora: row.PedidoFechaHora,
+          PedidoTotal: row.PedidoTotal,
+          PedidoEstado: row.PedidoEstado,
+          MesaNumero: row.MesaNumero,
+          Detalles: []
+        });
+      }
+      pedidosMap.get(key).Detalles.push({
+        DetallePedidoCodigo: row.detallePedidoCodigo,
+        Subtotal: row.detallePedidoSubtotal,
+        Cantidad: row.detallePedidoCantidad,
+        Estado: row.detallePedidoEstado,
+        Notas: row.detallePedidoNotas,
+        Producto: {
+          MenuCodigo: row.MenuCodigo,
+          MenuPlatos: row.MenuPlatos,
+          MenuPrecio: row.MenuPrecio,
+          MenuDescripcion: row.MenuDescripcion,
+          MenuImageUrl: row.MenuImageUrl,
+          MenuEsPreparado: row.MenuEsPreparado,
+          MenuCategoria: row.MenuCategoria
+        }
+      });
+    });
+
+    const pedidos = Array.from(pedidosMap.values());
+    const paginatedPedidos = pedidos.slice(offset, offset + parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      data: paginatedPedidos
+    });
+  } catch (error) {
+    console.error('Error al obtener todos los pedidos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno al obtener todos los pedidos'
+    });
+  }
+});
+
+
 router.put('/actualizarEstadoDetalle/:detallePedidoCodigo', async (req, res) => {
     const { detallePedidoCodigo } = req.params;
     const { nuevoEstado } = req.body;
@@ -604,6 +659,5 @@ router.post('/finalizar/:PedidoCodigo', async (req, res) => {
         });
     }
 });
-
 
 module.exports = router;
