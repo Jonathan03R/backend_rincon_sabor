@@ -194,6 +194,13 @@ CREATE TYPE Pedidos.TipoDetallePedido AS TABLE
 )
 GO
 
+create type DetalleRecetaType as table (
+    insumoCodigo nchar(10),
+    cantidad decimal(10,2)
+);
+go
+
+
 
 
 
@@ -391,6 +398,108 @@ as
 	end
 go
 
+-- Procedimiento para agregar categorias
+
+CREATE OR ALTER PROCEDURE Proc_AgregarCategoria
+    @CategoriaNombre NVARCHAR(100),
+    @CategoriaDescripcion NVARCHAR(200),
+    @CategoriaEstado NCHAR(1) = 'A' -- Estado por defecto: Activo
+AS
+  BEGIN
+
+    DECLARE @NuevoCodigo NCHAR(10);
+
+    -- Generar nuevo código para la categoría
+    BEGIN TRAN;
+
+    SELECT @NuevoCodigo = 'CAT' + RIGHT('0000000' + CAST(
+        ISNULL(MAX(CAST(SUBSTRING(CategoriaCodigo, 4, 7) AS INT)), 0) + 1 AS VARCHAR
+    ), 7)
+    FROM CategoriasProducto WITH (UPDLOCK, HOLDLOCK)
+    WHERE LEFT(CategoriaCodigo, 3) = 'CAT';
+
+    -- Insertar nueva categoría
+    INSERT INTO CategoriasProducto (
+        CategoriaCodigo,
+        CategoriaNombre,
+        CategoriaDescripcion,
+        CategoriaEstado
+    )
+    VALUES (
+        @NuevoCodigo,
+        @CategoriaNombre,
+        @CategoriaDescripcion,
+        @CategoriaEstado
+    );
+
+    COMMIT;
+
+    -- Retornar el código generado
+    SELECT @NuevoCodigo AS CategoriaCodigoCreada;
+  END
+GO
+
+-- Procedimiento para actualizar categorias
+
+CREATE OR ALTER PROCEDURE Proc_ActualizarCategorias
+    @CategoriaCodigo     NCHAR(10),
+    @CategoriaNombre     NVARCHAR(100),
+    @CategoriaDescripcion NVARCHAR(200),
+    @CategoriaEstado     NCHAR(1)
+AS
+BEGIN
+    -- Actualizar la categoría
+    UPDATE CategoriasProducto
+    SET 
+        CategoriaNombre = @CategoriaNombre,
+        CategoriaDescripcion = @CategoriaDescripcion
+    WHERE CategoriaCodigo = @CategoriaCodigo;
+END
+GO
+
+-- Procedimiento para eliminar una categoria
+
+CREATE OR ALTER PROCEDURE Proc_EliminarCategoria
+    @CategoriaCodigo NCHAR(10)
+AS
+  BEGIN
+
+    -- Verificar si la categoría existe
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM CategoriasProducto 
+        WHERE CategoriaCodigo = @CategoriaCodigo
+    )
+    BEGIN
+        RAISERROR('La categoría con el código especificado no existe.', 16, 1);
+        RETURN;
+    END
+
+    -- Eliminar los registros relacionados en Pedidos.DetallePedido
+    DELETE FROM Pedidos.DetallePedido
+    WHERE detallePedidoMenuCodigo IN (
+        SELECT MenuCodigo 
+        FROM Pedidos.Menu 
+        WHERE MenuCategoriaCodigo = @CategoriaCodigo
+    );
+
+    -- Eliminar los registros relacionados en Pedidos.Menu
+    DELETE FROM Pedidos.Menu
+    WHERE MenuCategoriaCodigo = @CategoriaCodigo;
+
+    -- Eliminar la categoría
+    DELETE FROM CategoriasProducto
+    WHERE CategoriaCodigo = @CategoriaCodigo;
+
+    -- Confirmar eliminación
+    IF @@ROWCOUNT = 0
+    BEGIN
+        RAISERROR('No se pudo eliminar la categoría.', 16, 1);
+    END
+  END
+GO
+
+
 --Procedimiento para mostrrar los productos con sus categoria
 
 CREATE OR ALTER PROCEDURE Proc_MostrarMenuCompleto
@@ -537,7 +646,147 @@ END
 GO
 
 
+create or alter procedure Proc_ActualizarMenuCompleto
+    @MenuCodigo nchar(10),
+    @MenuPlatos nvarchar(100),
+    @MenuDescripcion nvarchar(500),
+    @MenuPrecio decimal(10,2),
+    @MenuEstado nchar(1),
+    @MenuImageUrl nvarchar(max),
+    @MenuCategoriaCodigo nchar(10),
+    @MenuEsPreparado nchar(1),
+    @MenuInsumoCodigo nchar(10) = null, -- solo si no es preparado
+    @DetallesReceta DetalleRecetaType readonly -- tipo tabla
+as
+begin
+    begin try
+        begin transaction;
 
+        -- 1. Actualizar datos base del menú
+        update Pedidos.Menu
+        set MenuPlatos = @MenuPlatos,
+            MenuDescripcion = @MenuDescripcion,
+            MenuPrecio = @MenuPrecio,
+            MenuEstado = @MenuEstado,
+            MenuImageUrl = @MenuImageUrl,
+            MenuCategoriaCodigo = @MenuCategoriaCodigo,
+            MenuEsPreparado = @MenuEsPreparado,
+            MenuInsumoCodigo = @MenuInsumoCodigo
+        where MenuCodigo = @MenuCodigo;
+
+        -- 2. Si es preparado, manejar receta
+        if @MenuEsPreparado = 'A'
+        begin
+            declare @RecetaCodigo nchar(10);
+
+            -- Obtener receta asociada
+            select @RecetaCodigo = RecetaCodigo 
+            from Recetas 
+            where RecetaMenuCodigo = @MenuCodigo;
+
+            -- Si no existe receta, crearla
+            if @RecetaCodigo is null
+            begin
+                select @RecetaCodigo = 'REC' + RIGHT('0000000' + CAST(
+                    ISNULL(MAX(CAST(SUBSTRING(RecetaCodigo, 4, 7) AS INT)), 0) + 1 AS VARCHAR
+                ), 7)
+                from Recetas with (updlock, holdlock)
+                where LEFT(RecetaCodigo, 3) = 'REC';
+
+                insert into Recetas (RecetaCodigo, RecetaMenuCodigo, RecetaEstado)
+                values (@RecetaCodigo, @MenuCodigo, 'A');
+            end
+
+            -- Eliminar detalles anteriores
+            delete from RecetaDetalles where RecetaDetalleReceta = @RecetaCodigo;
+			--
+            -- Obtener contador base para código
+            declare @contadorBase int = (
+				select isnull(
+				  MAX(CAST(SUBSTRING(RecetaDetalleCodigo, 4, 7) AS int)), 
+				  0
+				)
+				from RecetaDetalles
+				where LEFT(RecetaDetalleCodigo,3) = 'DER'
+			);
+
+			-- Insertar nuevos detalles con prefijo DER
+			;with DetallesEnumerados as (
+				select 
+					ROW_NUMBER() over (order by (select null)) as RowNum,
+					insumoCodigo,
+					cantidad
+				from @DetallesReceta
+			)
+			insert into RecetaDetalles (
+				RecetaDetalleCodigo,
+				RecetaDetalleReceta,
+				RecetaDetalleInsumo,
+				RecetaDetalleCantidadporPlato
+			)
+			select 
+				'DER' 
+				  + RIGHT('0000000' 
+						  + CAST(@contadorBase + RowNum AS varchar(7))
+						,7),
+				@RecetaCodigo,
+				insumoCodigo,
+				cantidad
+			from DetallesEnumerados;
+        end
+
+        commit transaction;
+    end try
+    begin catch
+        rollback transaction;
+        throw;
+    end catch
+end
+go
+
+create or alter procedure ObtenerInformacionMenu
+    @MenuCodigo nchar(10)
+as
+begin
+    set nocount on;
+
+    select 
+        m.MenuCodigo,
+        m.MenuPlatos,
+        m.MenuDescripcion,
+        m.MenuPrecio,
+        m.MenuEstado,
+        m.MenuImageUrl,
+        m.MenuEsPreparado,
+        m.MenuCategoriaCodigo,
+        i.InsumoCodigo as InsumoDirectoCodigo,
+        i.InsumoNombre as InsumoDirectoNombre
+    from Pedidos.Menu m
+    left join Insumos i on m.MenuInsumoCodigo = i.InsumoCodigo
+    where m.MenuCodigo = @MenuCodigo;
+
+    -- Si el menú es preparado, mostrar los insumos de la receta
+    if exists (
+        select 1
+        from Pedidos.Menu
+        where MenuCodigo = @MenuCodigo and MenuEsPreparado = 'A'
+    )
+    begin
+        select 
+            rd.RecetaDetalleCodigo,
+            rd.RecetaDetalleCantidadporPlato,
+            ins.InsumoCodigo,
+            ins.InsumoNombre,
+            ins.InsumoUnidadMedida,
+            ins.InsumoStockActual,
+            ins.InsumoCompraUnidad
+        from Recetas r
+        inner join RecetaDetalles rd on r.RecetaCodigo = rd.RecetaDetalleReceta
+        inner join Insumos ins on rd.RecetaDetalleInsumo = ins.InsumoCodigo
+        where r.RecetaMenuCodigo = @MenuCodigo;
+    end
+end
+go
 
 --=============================================================================================================================================
 --								INSUMOS
@@ -917,7 +1166,17 @@ BEGIN
         d.detallePedidoMenuCodigo
     FROM @Detalles d
     CROSS JOIN CodigosBase c
-    WHERE d.detallePedidoCodigo = ''
+    WHERE d.detallePedidoCodigo = '';
+
+    -- 4. Recalcular y grabar el total del pedido
+    DECLARE @NuevoTotal DECIMAL(10,2);
+    SELECT @NuevoTotal = ISNULL(SUM(detallePedidoSubtotal),0)
+      FROM Pedidos.DetallePedido
+      WHERE detallePedidoPedidoCodigo = @PedidoCodigo;
+
+    UPDATE Pedidos.Pedido
+    SET PedidoTotal = @NuevoTotal
+    WHERE PedidoCodigo = @PedidoCodigo;
 END
 GO
 
@@ -946,11 +1205,13 @@ BEGIN
     -- Insertar pedido
     INSERT INTO Pedidos.Pedido (
         PedidoCodigo,
+		PedidoFechaHora, 
         PedidoTotal,
         PedidoMesaCodigo
     )
     VALUES (
         @PedidoCodigo,
+		SYSDATETIMEOFFSET() AT TIME ZONE 'SA Pacific Standard Time', 
         @Total,
         @MesaCodigo
     );
@@ -1081,6 +1342,30 @@ BEGIN
 END
 GO
 
+
+-- Vistas de Ganancias y Ventas EN OBSERVACION
+
+CREATE OR ALTER VIEW Ventas.VistaGananciasDeLasSemanas AS
+SELECT 
+    CONCAT('Semana ', DENSE_RANK() OVER (ORDER BY FechaInicioSemana)) AS Semana,
+    FechaInicioSemana,
+    FechaFinSemana,
+    SUM(PedidoTotal) AS TotalGanancia
+FROM (
+    SELECT
+        PedidoTotal,
+        PedidoFechaHora,
+        DATEADD(DAY, -DATEPART(WEEKDAY, PedidoFechaHora) + 1, CAST(PedidoFechaHora AS DATE)) AS FechaInicioSemana,
+        DATEADD(DAY, -DATEPART(WEEKDAY, PedidoFechaHora) + 7, CAST(PedidoFechaHora AS DATE)) AS FechaFinSemana
+    FROM Pedidos.Pedido
+    WHERE 
+        PedidoFechaHora >= DATEADD(WEEK, -4, GETDATE()) AND
+        PedidoFechaHora <= GETDATE() AND
+        PedidoEstado <> 'Cancelado'
+) AS Semanas
+GROUP BY FechaInicioSemana, FechaFinSemana;
+
+=======
 CREATE OR ALTER PROCEDURE Pedidos.Proc_ObtenerTodosLosPedidos
 AS
 BEGIN
@@ -1122,3 +1407,46 @@ BEGIN
         p.PedidoFechaHora ASC;
 END
 GO
+
+
+
+CREATE PROCEDURE Pedidos.Proc_ActualizarEstadoDetallePedido
+    @DetallePedidoCodigo NCHAR(10),
+    @NuevoEstado NVARCHAR(20)
+AS
+BEGIN
+    -- Validar estado permitido
+    IF @NuevoEstado NOT IN ('Pendiente', 'Preparando', 'Listo', 'Servido', 'Cancelado')
+    BEGIN
+        RAISERROR('Estado no válido.', 16, 1)
+        RETURN
+    END
+
+    -- Actualizar estado
+    UPDATE Pedidos.DetallePedido
+    SET detallePedidoEstado = @NuevoEstado
+    WHERE detallePedidoCodigo = @DetallePedidoCodigo
+END
+GO
+
+--Resumido en un proc.
+CREATE OR ALTER PROCEDURE Ventas.Proc_ResumenDiarioDelAnio
+    @Anio INT
+AS
+BEGIN
+    SELECT
+        CAST(PedidoFechaHora AS DATE) AS Fecha,
+        SUM(PedidoTotal) AS GananciasDelDia,
+        COUNT(*) AS NumeroPedidos
+    FROM 
+        Pedidos.Pedido
+    WHERE 
+        YEAR(PedidoFechaHora) = @Anio
+        AND PedidoEstado <> 'Cancelado'
+    GROUP BY
+        CAST(PedidoFechaHora AS DATE)
+    ORDER BY
+        Fecha
+END
+
+
