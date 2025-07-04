@@ -411,7 +411,7 @@ router.delete('/eliminar/:PedidoCodigo', async (req, res) => {
             success: false,
             message: 'Error interno al eliminar pedido'
         });
-    } ß
+    }
 });
 
 
