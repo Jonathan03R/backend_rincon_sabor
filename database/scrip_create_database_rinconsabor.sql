@@ -1448,5 +1448,27 @@ BEGIN
     ORDER BY
         Fecha
 END
+go
+
+CREATE OR ALTER PROCEDURE pro_ObtenerHistorialVentas
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        P.PedidoFechaHora,
+        M.MenuCodigo,
+        M.MenuPlatos,
+        DP.detallePedidoCantidad
+    FROM 
+        Pedidos.DetallePedido DP
+    JOIN 
+        Pedidos.Pedido P ON P.PedidoCodigo = DP.detallePedidoPedidoCodigo
+    JOIN 
+        Pedidos.Menu M ON M.MenuCodigo = DP.detallePedidoMenuCodigo
+    WHERE 
+        P.PedidoEstado IN ('Servido')
+END
+GO
 
 
