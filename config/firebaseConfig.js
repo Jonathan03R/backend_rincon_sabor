@@ -1,6 +1,6 @@
 var admin = require("firebase-admin");
 
-var serviceAccount = require("../app-rincon-sabor-flutter-firebase-adminsdk-fbsvc-6cadf848d1.json"); 
+var serviceAccount = require("../riconsabor-b1447-firebase-adminsdk-fbsvc-fdf93c4d88.json"); 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
