@@ -423,14 +423,35 @@ function formatFechaLima(fecha) {
         String(lima.getDate()).padStart(2, '0')
     ].join('-');
 }
+
 //mostrar pedido
+// Función mejorada para manejar fechas
+function obtenerRangoFechasActivas() {
+    const ahora = new Date();
+    const lima = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+    
+    // Incluir pedidos desde ayer que aún están activos
+    const ayer = new Date(lima);
+    ayer.setDate(lima.getDate() - 1);
+    
+    // Mañana para el límite superior
+    const manana = new Date(lima);
+    manana.setDate(lima.getDate() + 1);
+    
+    return {
+        fechaInicio: ayer.toISOString().split('T')[0],
+        fechaFin: manana.toISOString().split('T')[0],
+        fechaHoy: lima.toISOString().split('T')[0]
+    };
+}
+
+// Reemplazar el endpoint /activos
 router.get('/activos', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request()
             .execute(SP_OBTENER_PEDIDOS_ACTIVOS);
 
-        // Agrupar detalles por pedido
         const pedidosMap = new Map();
         result.recordset.forEach(row => {
             const key = row.PedidoCodigo;
@@ -463,25 +484,24 @@ router.get('/activos', async (req, res) => {
             });
         });
 
-        // Convertir a array y filtrar pedidos:
-        // Solo incluir los que NO tienen todos los detalles en 'Servido'
-        const hoyIso = formatFechaLima(new Date());
-        console.log('Hoy (Lima):', hoyIso);
+        const { fechaInicio, fechaHoy } = obtenerRangoFechasActivas();
+        console.log(`Buscando pedidos desde: ${fechaInicio} hasta hoy: ${fechaHoy}`);
 
+        // Filtro mejorado: incluye pedidos de ayer que siguen activos
         const pedidos = Array.from(pedidosMap.values()).filter(p => {
-            const fechaIso = formatFechaLima(new Date(p.PedidoFechaHora));
+            const fechaPedido = new Date(p.PedidoFechaHora).toISOString().split('T')[0];
             const estado = p.PedidoEstado.toLowerCase();
 
-            console.log(`Pedido ${p.PedidoCodigo}: fechaIso=${fechaIso}, estado=${estado}`);
+            // Incluir pedidos desde ayer que NO están servidos/cancelados
+            const esFechaValida = fechaPedido >= fechaInicio;
+            const esEstadoActivo = !['servido', 'cancelado'].includes(estado);
+            
+            console.log(`Pedido ${p.PedidoCodigo}: fecha=${fechaPedido}, estado=${estado}, válido=${esFechaValida && esEstadoActivo}`);
 
-            const pasaFecha = fechaIso === hoyIso;
-            const pasaEstado = !['servido', 'cancelado'].includes(estado);
-            console.log(` → pasaFecha? ${pasaFecha}, pasaEstado? ${pasaEstado}`);
-
-            return pasaFecha && pasaEstado;
+            return esFechaValida && esEstadoActivo;
         });
 
-        console.log(`Pedidos filtrados: ${pedidos.length}`);
+        console.log(`Pedidos activos encontrados: ${pedidos.length}`);
         res.status(200).json({
             success: true,
             data: pedidos
@@ -494,7 +514,6 @@ router.get('/activos', async (req, res) => {
         });
     }
 });
-
 
 // Nuevo endpoint para cambiar el estado del pedido
 router.put('/actualizarEstadoPedido/:PedidoCodigo', async (req, res) => {
