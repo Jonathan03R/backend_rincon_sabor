@@ -7,14 +7,14 @@ const {
     obtenerMenuController,
     actualizarMenuController,
     procesarMenuController
-} = require('../../controllers/menuController');
+} = require('../../../controllers/menuController');
 
-const menuService = require('../../services/menuService');
+const menuService = require('../../../services/menuService');
 
-jest.mock('../../services/menuService');
-jest.mock('../../utils/cloudinaryHelper');
-jest.mock('../../config/connection');
-jest.mock('../../sockets/menuSocket', () => ({
+jest.mock('../../../services/menuService');
+jest.mock('../../../utils/cloudinaryHelper');
+jest.mock('../../../config/connection');
+jest.mock('../../../sockets/menuSocket', () => ({
     emitirActualizacionMenus: jest.fn()
 }));
 

@@ -1,6 +1,6 @@
 // test/services/mesasService.test.js
 
-jest.mock('../../config/connection');
+jest.mock('../../../config/connection');
 
 describe('MesasService - Tests de funciones', () => {
 

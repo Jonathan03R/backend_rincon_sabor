@@ -1,6 +1,6 @@
 // test/services/usuariosService.test.js
 
-jest.mock('../../config/connection');
+jest.mock('../../../config/connection');
 
 describe('UsuariosService - Tests de funciones', () => {
 

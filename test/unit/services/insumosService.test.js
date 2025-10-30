@@ -1,6 +1,6 @@
 // test/services/insumosService.test.js
 
-jest.mock('../../config/connection');
+jest.mock('../../../config/connection');
 
 describe('InsumosService - Tests de funciones', () => {
 

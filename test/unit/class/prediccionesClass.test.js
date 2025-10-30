@@ -1,7 +1,8 @@
 // test/controllers/prediccionesController.test.js
 
-jest.mock('../../config/connection');
-jest.mock('../../middlewares/authMiddleware');
+jest.mock('../../../config/connection');
+jest.mock('../../../middlewares/authMiddleware');
+
 
 let req, res;
 

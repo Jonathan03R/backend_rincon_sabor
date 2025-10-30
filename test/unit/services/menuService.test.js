@@ -1,7 +1,6 @@
 // test/services/menuService.test.js
 
-jest.mock('../../config/connection');
-
+jest.mock('../../../config/connection');
 describe('MenuService - Tests de funciones', () => {
 
     let menuService;

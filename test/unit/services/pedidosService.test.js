@@ -1,6 +1,6 @@
 // test/services/pedidosService.test.js
 
-jest.mock('../../config/connection');
+jest.mock('../../../config/connection');
 
 describe('PedidosService - Tests de funciones', () => {
 

@@ -1,6 +1,6 @@
 // test/services/prediccionesService.test.js
 
-const prediccionesService = require('../../services/prediccionesService');
+const prediccionesService = require('../../../services/prediccionesService');
 
 describe('Pruebas del servicio prediccionesService', () => {
 

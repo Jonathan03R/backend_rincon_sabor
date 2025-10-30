@@ -1,5 +1,4 @@
 // jest.config.js
-
 module.exports = {
     testEnvironment: 'node',
     coverageDirectory: 'coverage',
@@ -12,7 +11,9 @@ module.exports = {
         '!**/config/**',
         '!**/sockets/**'
     ],
-    testMatch: ['**/test/**/*.test.js'],
+    // Solo tests unitarios
+    testMatch: ['**/test/unit/**/*.test.js'],
+    
     verbose: true,
     forceExit: true,
     detectOpenHandles: false,
@@ -21,10 +22,9 @@ module.exports = {
     // Mock automático de la conexión a BD
     setupFilesAfterEnv: ['<rootDir>/test/setup.js'],
     
-    // Ignorar warnings de tedious
-    testPathIgnorePatterns: ['/node_modules/', '/dist/'],
+    // CORRECCIÓN: Sin asteriscos en testPathIgnorePatterns
+    testPathIgnorePatterns: ['/node_modules/', '/dist/', '/integration/'],
     
-    // Configuración para manejar async
     bail: false,
     maxWorkers: '50%'
 };

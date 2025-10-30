@@ -1,6 +1,6 @@
 // test/services/categoriasService.test.js
 
-jest.mock('../../config/connection');
+jest.mock('../../../config/connection');
 
 describe('CategoriasService - Tests de funciones', () => {
 

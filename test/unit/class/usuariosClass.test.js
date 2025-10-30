@@ -2,8 +2,8 @@
 
 // No importamos módulos que no existen, solo hacemos unit tests puros
 
-jest.mock('../../config/connection');
-jest.mock('../../middlewares/authMiddleware');
+jest.mock('../../../config/connection');
+jest.mock('../../../middlewares/authMiddleware');
 
 let req, res;
 
